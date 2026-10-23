@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendOTP } = require("../services/emailService");
+const { verifyFirebaseToken, ensureFirebaseUser } = require("../config/firebase");
 
 /**
  * Register a new user
@@ -431,6 +432,154 @@ const logout = async (req, res) => {
   }
 };
 
+/**
+ * Authenticate or Register via Firebase ID Token
+ * Authoritative provider: Firebase Auth
+ * Automatically provisions or links MongoDB User record and issues Backend JWT
+ * Synchronizes password hash to MongoDB if password is provided
+ */
+const firebaseLogin = async (req, res) => {
+  try {
+    const { idToken, password, name } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Firebase ID token is required",
+      });
+    }
+
+    const decoded = await verifyFirebaseToken(idToken);
+    if (!decoded || !decoded.uid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired Firebase ID token",
+      });
+    }
+
+    const firebaseUid = decoded.uid;
+    const email = decoded.email ? decoded.email.trim().toLowerCase() : "";
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Firebase token does not contain a valid email",
+      });
+    }
+
+    console.log(`🔥 [FirebaseAuth] Verified ID token for: ${email} (UID: ${firebaseUid})`);
+
+    // Find MongoDB user by firebaseUid or email
+    let user = await User.findOne({
+      $or: [{ firebaseUid }, { email }],
+    });
+
+    if (!user) {
+      // Create new MongoDB user linked to Firebase UID
+      const hashedPassword = password ? await bcrypt.hash(password, 10) : "";
+      user = await User.create({
+        name: name?.trim() || decoded.name || email.split("@")[0],
+        email,
+        firebaseUid,
+        password: hashedPassword,
+      });
+      console.log(`👤 [FirebaseAuth] Created new MongoDB user for: ${email}`);
+    } else {
+      // Update existing user with Firebase UID
+      let shouldSave = false;
+      if (!user.firebaseUid) {
+        user.firebaseUid = firebaseUid;
+        shouldSave = true;
+      }
+      if (password) {
+        user.password = await bcrypt.hash(password, 10);
+        shouldSave = true;
+      }
+      if (name && !user.name) {
+        user.name = name.trim();
+        shouldSave = true;
+      }
+      if (shouldSave) {
+        await user.save();
+        console.log(`🔄 [FirebaseAuth] Updated MongoDB user credentials for: ${email}`);
+      }
+    }
+
+    // Issue backend JWT token
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || "default_jwt_secret",
+      { expiresIn: "7d" }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Login Successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        firebaseUid: user.firebaseUid,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Firebase Login Controller Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to authenticate with Firebase",
+    });
+  }
+};
+
+/**
+ * Prepare Firebase Password Reset
+ * Ensures that existing MongoDB users are provisioned in Firebase Auth
+ * so that sendPasswordResetEmail will not fail with auth/user-not-found
+ */
+const preparePasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!/\S+@\S+\.\S+/.test(cleanEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address",
+      });
+    }
+
+    console.log(`📩 [Reset] Prepare password reset for: ${cleanEmail}`);
+    const user = await User.findOne({ email: cleanEmail });
+
+    if (user) {
+      try {
+        await ensureFirebaseUser(cleanEmail, user.name);
+      } catch (fbErr) {
+        console.warn(`⚠️ [Reset] ensureFirebaseUser notice: ${fbErr.message}`);
+      }
+    }
+
+    // Safe non-enumeration response
+    return res.status(200).json({
+      success: true,
+      message: "If an account with this email exists, a password reset link has been dispatched.",
+    });
+  } catch (err) {
+    console.error("❌ Prepare Reset Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to process password reset request",
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -438,4 +587,6 @@ module.exports = {
   verifyOTP,
   resetPassword,
   logout,
+  firebaseLogin,
+  preparePasswordReset,
 };

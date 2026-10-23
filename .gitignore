@@ -29,3 +29,7 @@ coverage/
 # Build folders
 dist/
 build/
+
+# Firebase Admin Service Accounts (Secrets - Never commit)
+*-firebase-adminsdk-*.json
+*service-account*.json

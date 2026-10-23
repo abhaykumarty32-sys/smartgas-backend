@@ -19,7 +19,13 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      required: true,
+      default: "",
+    },
+
+    firebaseUid: {
+      type: String,
+      default: "",
+      index: true,
     },
 
     expoPushTokens: {

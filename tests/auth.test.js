@@ -13,6 +13,24 @@ jest.mock("../services/emailService", () => ({
   sendOTP: jest.fn().mockResolvedValue({ success: true, provider: "resend", messageId: "msg_123" }),
 }));
 
+jest.mock("../config/firebase", () => ({
+  verifyFirebaseToken: jest.fn().mockImplementation(async (token) => {
+    if (token === "valid-firebase-token") {
+      return {
+        uid: "firebase_uid_123",
+        email: "operator@factory.com",
+        name: "Abhay Tester",
+      };
+    }
+    throw new Error("Invalid Firebase token");
+  }),
+  ensureFirebaseUser: jest.fn().mockResolvedValue({
+    uid: "firebase_uid_123",
+    email: "operator@factory.com",
+  }),
+  initFirebaseAdmin: jest.fn().mockReturnValue({ auth: {} }),
+}));
+
 const request = require("supertest");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
@@ -312,5 +330,76 @@ describe("Authentication & Secure OTP Forgot Password Flow", () => {
       expect(goodRes.body).toHaveProperty("token");
     });
   });
+
+  describe("Firebase Authentication & Reset Synchronization", () => {
+    test("POST /api/auth/firebase-login: rejects request without idToken", async () => {
+      const res = await request(app).post("/api/auth/firebase-login").send({});
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+
+    test("POST /api/auth/firebase-login: authenticates with valid Firebase ID token and links MongoDB user", async () => {
+      const mockUserDoc = {
+        _id: testUser._id,
+        name: testUser.name,
+        email: testUser.email,
+        firebaseUid: "",
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      jest.spyOn(User, "findOne").mockResolvedValue(mockUserDoc);
+
+      const res = await request(app).post("/api/auth/firebase-login").send({
+        idToken: "valid-firebase-token",
+        password: "newFirebasePassword123",
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body).toHaveProperty("token");
+      expect(res.body.user.email).toBe(testUser.email);
+      expect(mockUserDoc.save).toHaveBeenCalled();
+      expect(mockUserDoc.firebaseUid).toBe("firebase_uid_123");
+    });
+
+    test("POST /api/auth/prepare-reset: ensures user exists and returns non-enumeration response", async () => {
+      jest.spyOn(User, "findOne").mockResolvedValue({
+        _id: testUser._id,
+        email: testUser.email,
+        name: testUser.name,
+      });
+
+      const res = await request(app).post("/api/auth/prepare-reset").send({
+        email: testUser.email,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toContain("If an account with this email exists");
+    });
+
+    test("authMiddleware: verifies protected route with Firebase ID token", async () => {
+      jest.spyOn(User, "findOne").mockResolvedValue({
+        _id: testUser._id,
+        email: testUser.email,
+        firebaseUid: "firebase_uid_123",
+        save: jest.fn().mockResolvedValue(true),
+      });
+      jest.spyOn(User, "findById").mockResolvedValue({
+        _id: testUser._id,
+        expoPushTokens: [],
+        save: jest.fn().mockResolvedValue(true),
+      });
+
+      const res = await request(app)
+        .post("/api/auth/logout")
+        .set("Authorization", "Bearer valid-firebase-token")
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
 });
+
 
