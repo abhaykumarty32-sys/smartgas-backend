@@ -63,6 +63,7 @@ exports.getUserAlerts = async (req, res) => {
             return {
                 _id: alert._id,
                 deviceId: alert.deviceId,
+                deviceMongoId: dev ? dev._id : null,
                 deviceName: dev ? dev.deviceName : alert.deviceId,
                 location: dev ? dev.location : "",
                 gas: alert.gas,
