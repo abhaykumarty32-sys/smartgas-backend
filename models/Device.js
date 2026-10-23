@@ -55,7 +55,7 @@ const deviceSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-       alertState: {
+    alertState: {
         type: String,
         enum: ["Normal", "Warning", "Critical"],
         default: "Normal"
@@ -69,9 +69,9 @@ const deviceSchema = new mongoose.Schema({
         default: false
     },
     location: {
-    type: String,
-    default: "",
-},
+        type: String,
+        default: "",
+    },
 
     // Online / Offline
     status: {

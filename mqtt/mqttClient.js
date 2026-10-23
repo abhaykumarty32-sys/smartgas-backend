@@ -90,37 +90,37 @@ function startMQTT(io) {
                 return;
             }
 
-// =================================================
-// VALVE STATUS
-// =================================================
+            // =================================================
+            // VALVE STATUS
+            // =================================================
 
-if (topicType === "valve") {
+            if (topicType === "valve") {
 
-    const valveValue = Boolean(data.valve);
+                const valveValue = Boolean(data.valve);
 
-    device.valve = valveValue;
-    device.status = "online";
-    device.lastSeen = new Date();
+                device.valve = valveValue;
+                device.status = "online";
+                device.lastSeen = new Date();
 
-    await device.save();
+                await device.save();
 
-    io.to(device.userId.toString()).emit(
-        "valve-status",
-        {
-            deviceId: device.deviceId,
-            valve: device.valve,
-            status: "online",
-            lastSeen: device.lastSeen
-        }
-    );
+                io.to(device.userId.toString()).emit(
+                    "valve-status",
+                    {
+                        deviceId: device.deviceId,
+                        valve: device.valve,
+                        status: "online",
+                        lastSeen: device.lastSeen
+                    }
+                );
 
-    console.log(
-        "✅ Valve Status Updated from MQTT:",
-        device.valve
-    );
+                console.log(
+                    "✅ Valve Status Updated from MQTT:",
+                    device.valve
+                );
 
-    return;
-}
+                return;
+            }
             // =================================================
             // RELAY STATUS
             // =================================================
@@ -206,7 +206,7 @@ if (topicType === "valve") {
 
                         relay: device.relay,
 
-                        
+
 
                         status: "online",
 
@@ -292,80 +292,80 @@ if (topicType === "valve") {
             // ESP32 ACK
             // =================================================
 
-           if (topicType === "ack") {
+            if (topicType === "ack") {
 
-    console.log("================================");
-    console.log("📩 ESP32 ACK RECEIVED");
-    console.log("Device :", deviceId);
-    console.log("ACK    :", data);
+                console.log("================================");
+                console.log("📩 ESP32 ACK RECEIVED");
+                console.log("Device :", deviceId);
+                console.log("ACK    :", data);
 
-    // ---------------------------------------------
-    // Validate ACK
-    // ---------------------------------------------
+                // ---------------------------------------------
+                // Validate ACK
+                // ---------------------------------------------
 
-    if (!data.action) {
-        console.log("❌ ACK missing action");
-        return;
-    }
+                if (!data.action) {
+                    console.log("❌ ACK missing action");
+                    return;
+                }
 
-    // ---------------------------------------------
-    // Update MongoDB ONLY after successful ACK
-    // ---------------------------------------------
+                // ---------------------------------------------
+                // Update MongoDB ONLY after successful ACK
+                // ---------------------------------------------
 
-    if (data.success === true) {
+                if (data.success === true) {
 
-        const update = {};
+                    const update = {};
 
-        if (data.mode !== undefined) {
-          update.mode = data.mode;
-        }  
+                    if (data.mode !== undefined) {
+                        update.mode = data.mode;
+                    }
 
-        if (data.valve !== undefined) {
-            update.valve = data.valve;
-        }
+                    if (data.valve !== undefined) {
+                        update.valve = data.valve;
+                    }
 
-        if (data.relay !== undefined) {
-            update.relay = data.relay;
-        }
+                    if (data.relay !== undefined) {
+                        update.relay = data.relay;
+                    }
 
-        if (Object.keys(update).length > 0) {
+                    if (Object.keys(update).length > 0) {
 
-            update.status = "online";
-            update.lastSeen = new Date();
+                        update.status = "online";
+                        update.lastSeen = new Date();
 
-            await Device.findOneAndUpdate(
-                { deviceId: deviceId },
-                { $set: update }
-            );
+                        await Device.findOneAndUpdate(
+                            { deviceId: deviceId },
+                            { $set: update }
+                        );
 
-            console.log(
-                "✅ Device state updated from ACK:",
-                update
-            );
-        }
-    }
+                        console.log(
+                            "✅ Device state updated from ACK:",
+                            update
+                        );
+                    }
+                }
 
-    // ---------------------------------------------
-    // Send ACK to Mobile App
-    // ---------------------------------------------
+                // ---------------------------------------------
+                // Send ACK to Mobile App
+                // ---------------------------------------------
 
-    io.to(device.userId.toString()).emit(
-        "device-ack",
-        {
-            deviceId: device.deviceId,
-            action: data.action,
-            success: data.success === true,
-            mode: data.mode,
-            valve: data.valve,
-            relay: data.relay,
-            message: data.message
-        }
-    );
+                io.to(device.userId.toString()).emit(
+                    "device-ack",
+                    {
+                        deviceId: device.deviceId,
+                        action: data.action,
+                        success: data.success === true,
+                        mode: data.mode,
+                        valve: data.valve,
+                        relay: data.relay,
+                        message: data.message
+                    }
+                );
 
-    console.log("📱 ACK sent to Socket.IO");
+                console.log("📱 ACK sent to Socket.IO");
 
-    return;
-}
+                return;
+            }
 
             // =================================================
             // GAS SENSOR

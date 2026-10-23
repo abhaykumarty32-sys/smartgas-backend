@@ -2,37 +2,37 @@ const Device = require("../models/Device");
 
 function startDeviceStatusService(io) {
 
-    setInterval(async () => {
+  setInterval(async () => {
 
-        try {
+    try {
 
-            const timeout = new Date(Date.now() - 60000);
+      const timeout = new Date(Date.now() - 60000);
 
-            const offlineDevices = await Device.find({
-                lastSeen: { $lt: timeout },
-                status: "online"
-            });
+      const offlineDevices = await Device.find({
+        lastSeen: { $lt: timeout },
+        status: "online"
+      });
 
-            for (const device of offlineDevices) {
+      for (const device of offlineDevices) {
 
-                device.status = "offline";
-                await device.save();
+        device.status = "offline";
+        await device.save();
 
-                io.to(device.userId.toString()).emit("deviceOffline", {
-                    deviceId: device.deviceId
-                });
+        io.to(device.userId.toString()).emit("deviceOffline", {
+          deviceId: device.deviceId
+        });
 
-                console.log(`${device.deviceId} marked offline`);
+        console.log(`${device.deviceId} marked offline`);
 
-            }
+      }
 
-        } catch (err) {
+    } catch (err) {
 
-            console.log(err.message);
+      console.log(err.message);
 
-        }
+    }
 
-    }, 30000);
+  }, 30000);
 
 }
 

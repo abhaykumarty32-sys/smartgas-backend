@@ -21,17 +21,19 @@ router.put("/clear-single/:alertId", auth, clearSingleNotification);
 router.delete("/single/:alertId", auth, clearSingleNotification);
 
 // Device-specific Alert History routes (permanent history per device)
-router.get("/:deviceId", auth, getAlerts);
-router.delete("/:deviceId", auth, deleteAlerts);
 router.get(
     "/unread-count",
     auth,
     getUnreadNotificationCount
 );
-
 router.post(
     "/mark-read",
     auth,
     markNotificationsRead
 );
+
+router.get("/:deviceId", auth, getAlerts);
+router.delete("/:deviceId", auth, deleteAlerts);
+
+
 module.exports = router;
