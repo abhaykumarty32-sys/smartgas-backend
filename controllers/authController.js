@@ -141,10 +141,14 @@ const forgotPassword = async (req, res) => {
       });
     }
 
+    console.log(`📩 [Auth] Forgot password request received for: ${cleanEmail}`);
+
     const user = await User.findOne({ email: cleanEmail });
+    console.log(`🔍 [Auth] Database lookup completed for: ${cleanEmail} (User found: ${!!user})`);
 
     // Protect against user enumeration: return success even if email is not found
     if (!user) {
+      console.log(`📤 [Auth] Response returned to frontend (200 OK - Safe non-enumeration response)`);
       return res.status(200).json({
         success: true,
         message: "If an account with this email exists, a verification code has been sent.",
@@ -157,6 +161,7 @@ const forgotPassword = async (req, res) => {
       const COOLDOWN_MS = 60 * 1000;
       if (elapsedMs < COOLDOWN_MS) {
         const remainingSecs = Math.ceil((COOLDOWN_MS - elapsedMs) / 1000);
+        console.log(`📤 [Auth] Response returned to frontend (429 Cooldown active: ${remainingSecs}s remaining)`);
         return res.status(429).json({
           success: false,
           cooldown: true,
@@ -181,16 +186,21 @@ const forgotPassword = async (req, res) => {
     await user.save();
 
     // Deliver OTP via Resend HTTPS (or SMTP fallback)
+    const providerName = process.env.RESEND_API_KEY ? "Resend HTTPS" : "SMTP";
+    console.log(`⏳ [Auth] Email sending started for: ${user.email} (Provider: ${providerName})`);
     const emailResult = await sendOTP(user.email, otp);
 
     if (!emailResult.success) {
-      console.error(`❌ [ForgotPassword] Email delivery failed: ${emailResult.error}`);
+      console.error(`❌ [Auth] Email sending failed: ${emailResult.error}`);
+      console.log(`📤 [Auth] Response returned to frontend (502 Delivery Failed)`);
       return res.status(502).json({
         success: false,
         message: emailResult.error || "Failed to deliver OTP email. Please try again later.",
       });
     }
 
+    console.log(`✅ [Auth] Email sending succeeded for: ${user.email}`);
+    console.log(`📤 [Auth] Response returned to frontend (200 OK)`);
     return res.status(200).json({
       success: true,
       message: "A 6-digit verification code has been sent to your email.",

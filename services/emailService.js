@@ -26,6 +26,9 @@ function getSmtpTransporter() {
           user: process.env.EMAIL,
           pass: process.env.EMAIL_PASSWORD,
         },
+        connectionTimeout: 8000, // Fail-fast 8s timeout to prevent hanging on blocked cloud ports
+        greetingTimeout: 8000,
+        socketTimeout: 8000,
       });
     }
     return smtpTransporter;
