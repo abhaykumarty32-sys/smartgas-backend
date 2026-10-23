@@ -45,7 +45,7 @@ exports.getUserAlerts = async (req, res) => {
         const userId = req.user.id;
 
         const userDevices = await Device.find({ userId }).select("deviceId deviceName location");
-        
+
         const deviceMap = {};
         const deviceIds = userDevices.map((d) => {
             deviceMap[d.deviceId] = d;
@@ -63,7 +63,6 @@ exports.getUserAlerts = async (req, res) => {
             return {
                 _id: alert._id,
                 deviceId: alert.deviceId,
-                deviceMongoId: dev ? dev._id : null,
                 deviceName: dev ? dev.deviceName : alert.deviceId,
                 location: dev ? dev.location : "",
                 gas: alert.gas,

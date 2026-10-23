@@ -1,4 +1,3 @@
-const mongoose = require("mongoose");
 const Device = require("../models/Device");
 const { publishCommand } = require("../mqtt/mqttPublisher");
 exports.registerDevice = async (req, res) => {
@@ -181,12 +180,11 @@ exports.deleteDevice = async (req, res) => {
 // };
 exports.getDeviceById = async (req, res) => {
   try {
-    const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
-    const query = isObjectId
-      ? { $or: [{ _id: req.params.id }, { deviceId: req.params.id }], userId: req.user.id }
-      : { deviceId: req.params.id, userId: req.user.id };
 
-    const device = await Device.findOne(query);
+    const device = await Device.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
 
     if (!device) {
       return res.status(404).json({
